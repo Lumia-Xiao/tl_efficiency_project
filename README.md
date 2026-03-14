@@ -48,7 +48,7 @@ python -m src.train
 Optional arguments:
 
 ```bash
-python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 256
+python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 16
 ```
 
 Run baseline + ablations:
@@ -69,3 +69,18 @@ Included comparisons:
 2. Source-domain validation is used to select the best pretrained model.
 3. Target-domain fine-tuning uses only total-loss supervision.
 4. Component predictions in the target domain are latent but physically constrained to be non-negative and additive.
+
+## Baseline and ablation experiments
+
+To quantify the value of transfer + component supervision, run:
+
+```bash
+python -m src.experiments
+```
+
+This compares:
+- `baseline_target_only_total_regression`: total-loss regressor trained only on target data.
+- `ablation_no_component_supervision`: transfer-learning with sum-constraint, but source component loss disabled (`lambda_src_components=0`).
+- `proposed`: full method with source component supervision + total-loss consistency.
+
+Results are saved to `outputs/experiment_comparison.json` with a summary improvement metric.

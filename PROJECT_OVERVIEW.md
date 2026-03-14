@@ -22,7 +22,6 @@ The model predicts component losses and computes total loss as their sum, so the
 - `src/data_utils.py`: CSV loading, domain splits, scaling policy, `Dataset`/`DataLoader` construction, scaler persistence.
 - `src/model.py`: MLP backbone and component head with `Softplus` non-negativity; total prediction is computed by summation.
 - `src/train.py`: CLI, seed setup, source pretraining loop, source+target fine-tuning loop, early stopping, artifact writing.
-- `src/experiments.py`: runs baseline and ablation studies to quantify gains from transfer + component supervision.
 - `src/evaluate.py`: regression metrics, batch prediction collection, JSON metrics persistence, and plotting utilities.
 
 ## Notable design choices
@@ -48,11 +47,5 @@ python -m src.train
 Override key hyperparameters:
 
 ```bash
-python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 256
-```
-
-Run baseline + ablation experiments:
-
-```bash
-python -m src.experiments --output outputs/experiments/metrics.json
+python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 16
 ```
