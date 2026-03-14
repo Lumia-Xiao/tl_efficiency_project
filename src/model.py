@@ -45,3 +45,17 @@ class ComponentSumModel(nn.Module):
     def freeze_backbone(self) -> None:
         for p in self.backbone.parameters():
             p.requires_grad = False
+
+
+class TotalBaselineModel(nn.Module):
+    """A baseline model that predicts total loss directly."""
+
+    def __init__(self, in_dim: int, hidden_dims: List[int], dropout: float):
+        super().__init__()
+        self.backbone = MLPBackbone(in_dim=in_dim, hidden_dims=hidden_dims, dropout=dropout)
+        self.head = nn.Linear(self.backbone.out_dim, 1)
+
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        feat = self.backbone(x)
+        total_pred = self.head(feat)
+        return {"total": total_pred}
