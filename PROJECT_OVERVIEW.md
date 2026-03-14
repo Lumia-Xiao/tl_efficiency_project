@@ -47,5 +47,5 @@ python -m src.train
 Override key hyperparameters:
 
 ```bash
-python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 16
+python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 256
 ```

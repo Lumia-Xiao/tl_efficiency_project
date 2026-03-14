@@ -168,8 +168,8 @@ def train_baseline_target_only(cfg: Config) -> Tuple[Dict, Dict]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run baseline + ablation experiments against the proposed method.")
     parser.add_argument("--output", type=str, default="outputs/experiment_comparison.json")
-    parser.add_argument("--epochs-pretrain", type=int, default=120)
-    parser.add_argument("--epochs-finetune", type=int, default=160)
+    parser.add_argument("--epochs-pretrain", type=int, default=300)
+    parser.add_argument("--epochs-finetune", type=int, default=400)
     parser.add_argument("--patience", type=int, default=25)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="cpu")
