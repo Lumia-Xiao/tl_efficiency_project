@@ -28,12 +28,15 @@ def collect_predictions(model, data_loader, device: str) -> Dict[str, np.ndarray
     model.eval()
     comps, totals, y_total = [], [], []
     has_comp = False
+    has_pred_comp = False
     y_comp = []
 
     for batch in data_loader:
         x = batch["x"].to(device)
         out = model(x)
-        comps.append(out["components"].cpu().numpy())
+        if "components" in out:
+            has_pred_comp = True
+            comps.append(out["components"].cpu().numpy())
         totals.append(out["total"].cpu().numpy())
         y_total.append(batch["total"].cpu().numpy())
         if "comp" in batch:
@@ -41,10 +44,11 @@ def collect_predictions(model, data_loader, device: str) -> Dict[str, np.ndarray
             y_comp.append(batch["comp"].cpu().numpy())
 
     result = {
-        "pred_components": np.vstack(comps),
         "pred_total": np.vstack(totals),
         "true_total": np.vstack(y_total),
     }
+    if has_pred_comp:
+        result["pred_components"] = np.vstack(comps)
     if has_comp:
         result["true_components"] = np.vstack(y_comp)
     return result

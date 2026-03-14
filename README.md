@@ -26,6 +26,7 @@ During target-domain training, only the total loss is supervised.
 - `src/data_utils.py`: loading, scaling, dataset builders
 - `src/model.py`: multi-head MLP with non-negative component outputs
 - `src/train.py`: source pretraining + target weakly supervised fine-tuning
+- `src/experiments.py`: baseline and ablation experiments for method comparison
 - `src/evaluate.py`: metrics and plotting helpers
 - `data/`: CSV files
 - `outputs/`: checkpoints, metrics, figures
@@ -49,6 +50,18 @@ Optional arguments:
 ```bash
 python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 256
 ```
+
+Run baseline + ablations:
+
+```bash
+python -m src.experiments --output outputs/experiments/metrics.json
+```
+
+Included comparisons:
+- `full_method`: source pretraining + source/target fine-tuning with component supervision.
+- `baseline_target_only_total_model`: direct total-loss MLP trained only on target data.
+- `ablation_no_component_supervision`: transfer pipeline with source component loss weight set to 0.
+- `ablation_no_source_transfer`: constrained model trained only on target total labels.
 
 ## Notes
 
