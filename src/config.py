@@ -20,13 +20,13 @@ class Config:
     target_val_ratio: float = 0.2
     random_seed: int = 42
 
-    batch_size: int = 256
+    batch_size: int = 32
     hidden_dims: List[int] = field(default_factory=lambda: [128, 128, 64])
     dropout: float = 0.1
 
     lr: float = 1e-3
     weight_decay: float = 1e-4
-    epochs_pretrain: int = 300
+    epochs_pretrain: int = 400
     epochs_finetune: int = 400
     early_stop_patience: int = 40
 
