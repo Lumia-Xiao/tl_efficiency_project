@@ -1,0 +1,65 @@
+{
+  "baseline_target_only_total_regression": {
+    "meta": {
+      "name": "baseline_target_only_total_regression",
+      "uses_source_transfer": false,
+      "uses_component_supervision": false,
+      "uses_sum_constraint": false
+    },
+    "metrics": {
+      "target_val_total": {
+        "MAE": 2.3035519123077393,
+        "RMSE": 2.6473851203918457,
+        "MAPE_pct": 16.127482056617737,
+        "R2": 0.8872741525659442
+      }
+    }
+  },
+  "ablation_no_component_supervision": {
+    "meta": {
+      "name": "ablation_no_component_supervision",
+      "uses_source_transfer": true,
+      "uses_component_supervision": false,
+      "uses_sum_constraint": true
+    },
+    "metrics": {
+      "target_val_total": {
+        "MAE": 2.31632137298584,
+        "RMSE": 2.767045497894287,
+        "MAPE_pct": 13.125735521316528,
+        "R2": 0.8768535523676452
+      },
+      "source_val_total": {
+        "MAE": 0.853545069694519,
+        "RMSE": 1.2110445499420166,
+        "MAPE_pct": 6.313978135585785,
+        "R2": 0.9873453312896859
+      }
+    }
+  },
+  "proposed": {
+    "meta": {
+      "name": "proposed",
+      "uses_source_transfer": true,
+      "uses_component_supervision": true,
+      "uses_sum_constraint": true
+    },
+    "metrics": {
+      "target_val_total": {
+        "MAE": 1.645089030265808,
+        "RMSE": 1.9813461303710938,
+        "MAPE_pct": 10.013478249311447,
+        "R2": 0.9368592144035157
+      },
+      "source_val_total": {
+        "MAE": 0.9617332816123962,
+        "RMSE": 1.3497555255889893,
+        "MAPE_pct": 7.1320123970508575,
+        "R2": 0.984280424888677
+      }
+    }
+  },
+  "summary": {
+    "target_rmse_improvement_vs_baseline_pct": 25.15837174162896
+  }
+}
