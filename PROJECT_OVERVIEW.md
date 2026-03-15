@@ -27,6 +27,7 @@ The model predicts component losses and computes total loss as their sum, so the
 - `src/gui_app.py`: Tkinter GUI that takes Vin/Vo/D1/D2/DT/Fs/Po and predicts PIron/PCond/PCopp/PSw/Ploss for simulation and experiment checkpoints, with artifact path selectors when defaults are missing.
 
 ## Notable design choices
+- **GUI guardrails and comparison charts**: input-scope validation blocks out-of-scope queries; stacked-bar and pie charts visualize component/total differences between simulation and experiment domains.
 - **Constraint by construction**: `total = sum(components)` is implemented in the forward pass.
 - **Non-negative components**: `Softplus` ensures each component prediction is >= 0.
 - **Source-first scaling**: avoids leakage by fitting the scaler on source-train only.

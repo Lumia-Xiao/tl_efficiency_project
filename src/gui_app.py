@@ -5,7 +5,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import joblib
 import numpy as np
@@ -13,11 +13,27 @@ import torch
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from src.config import Config
 from src.model import ComponentSumModel
+
+
+INPUT_BOUNDS: Dict[str, Tuple[float, float]] = {
+    "Vin": (200.0, 450.0),
+    "Vo": (200.0, 800.0),
+    "D1": (0.0, 1.0),
+    "D2": (0.0, 1.0),
+    "DT": (0.0, 0.03),
+    "Fs": (20000.0, 100000.0),
+    "Po": (100.0, 7000.0),
+}
 
 
 @dataclass
@@ -72,6 +88,18 @@ def load_artifacts(cfg: Config, device: str, paths: Dict[str, str]) -> ArtifactB
     return ArtifactBundle(scaler=scaler, models=models, missing=missing)
 
 
+def validate_inputs(values: Dict[str, float]) -> tuple[bool, str]:
+    for key, (low, high) in INPUT_BOUNDS.items():
+        value = values[key]
+        if value < low or value > high:
+            return False, f"{key}={value} is out of scope. Allowed range: [{low}, {high}]"
+
+    if values["Vin"] >= values["Vo"]:
+        return False, f"Input is out of scope: require Vin < Vo, but got Vin={values['Vin']}, Vo={values['Vo']}."
+
+    return True, ""
+
+
 def predict_row(models: List[LoadedModel], scaler, values: List[float], cfg: Config, device: str) -> Dict[str, Dict[str, float]]:
     x_np = np.asarray(values, dtype=np.float32).reshape(1, -1)
     x_scaled = scaler.transform(x_np)
@@ -95,7 +123,9 @@ class LossPredictorGUI:
         self.cfg = cfg
         self.device = device
         self.root.title("Transformer Loss Component Predictor")
-        self.root.geometry("1060x620")
+        self.root.geometry("1300x860")
+
+        self._configure_fonts()
 
         defaults = _default_paths(cfg)
         self.paths = {
@@ -107,15 +137,14 @@ class LossPredictorGUI:
         self.models: List[LoadedModel] = []
         self.scaler = None
 
-        top = ttk.Frame(root, padding=12)
+        top = ttk.Frame(root, padding=14)
         top.pack(fill=tk.BOTH, expand=True)
 
         info = ttk.Label(
             top,
             text=(
-                "Enter Vin, Vo, D1, D2, DT, Fs, Po.\n"
-                "Predicts PIron, PCond, PCopp, PSw, Ploss for simulation_domain and experiment_domain.\n"
-                "If artifacts are missing, choose paths below and click 'Load Artifacts'."
+                "Input range limits: Vin[200,450], Vo[200,800], Vin<Vo, D1/D2[0,1], DT[0,0.03], Fs[20000,100000], Po[100,7000].\n"
+                "If any input is out of scope, prediction is blocked and marked as out of scope."
             ),
             justify=tk.LEFT,
         )
@@ -131,36 +160,109 @@ class LossPredictorGUI:
 
         ttk.Button(path_frame, text="Load Artifacts", command=self.on_load_artifacts).grid(row=3, column=2, sticky="e", pady=(8, 0))
 
-        form = ttk.Frame(top)
+        form = ttk.LabelFrame(top, text="Inputs", padding=8)
         form.pack(fill=tk.X)
 
         self.entries: Dict[str, tk.StringVar] = {}
         for idx, col in enumerate(cfg.input_cols):
             r, c = divmod(idx, 4)
             label = ttk.Label(form, text=col, width=8)
-            label.grid(row=r * 2, column=c, sticky="w", padx=6, pady=(4, 0))
+            label.grid(row=r * 2, column=c, sticky="w", padx=8, pady=(4, 0))
             var = tk.StringVar(value="0")
             entry = ttk.Entry(form, textvariable=var, width=16)
-            entry.grid(row=r * 2 + 1, column=c, sticky="we", padx=6, pady=(0, 8))
+            entry.grid(row=r * 2 + 1, column=c, sticky="we", padx=8, pady=(0, 8))
             self.entries[col] = var
 
         btn_frame = ttk.Frame(top)
-        btn_frame.pack(fill=tk.X, pady=(6, 8))
+        btn_frame.pack(fill=tk.X, pady=(8, 8))
         self.predict_btn = ttk.Button(btn_frame, text="Predict", command=self.on_predict)
         self.predict_btn.pack(side=tk.LEFT)
         ttk.Button(btn_frame, text="Clear", command=self.on_clear).pack(side=tk.LEFT, padx=8)
 
         columns = ["domain"] + cfg.component_cols + [cfg.total_col]
-        self.table = ttk.Treeview(top, columns=columns, show="headings", height=8)
+        self.table = ttk.Treeview(top, columns=columns, show="headings", height=5)
         for col in columns:
             self.table.heading(col, text=col)
-            self.table.column(col, width=145, anchor=tk.CENTER)
-        self.table.pack(fill=tk.BOTH, expand=True)
+            self.table.column(col, width=170, anchor=tk.CENTER)
+        self.table.pack(fill=tk.X, expand=False)
+
+        chart_frame = ttk.Frame(top)
+        chart_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+
+        self.fig = Figure(figsize=(12, 4.8), dpi=100)
+        self.ax_stack = self.fig.add_subplot(1, 2, 1)
+        self.ax_pie = self.fig.add_subplot(1, 2, 2)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=chart_frame)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self._draw_empty_charts()
 
         self.status = ttk.Label(top, text="")
         self.status.pack(anchor=tk.W, pady=(8, 0))
 
         self.on_load_artifacts(show_dialog=False)
+
+    def _configure_fonts(self) -> None:
+        self.root.option_add("*Font", "SegoeUI 11")
+        style = ttk.Style()
+        style.configure("Treeview", rowheight=28, font=("SegoeUI", 11))
+        style.configure("Treeview.Heading", font=("SegoeUI", 11, "bold"))
+        style.configure("TLabel", font=("SegoeUI", 11))
+        style.configure("TButton", font=("SegoeUI", 11))
+        style.configure("TLabelframe.Label", font=("SegoeUI", 11, "bold"))
+
+    def _draw_empty_charts(self) -> None:
+        self.ax_stack.clear()
+        self.ax_pie.clear()
+        self.ax_stack.set_title("Stacked component losses by domain")
+        self.ax_stack.set_ylabel("Loss (W)")
+        self.ax_stack.text(0.5, 0.5, "Run prediction to view chart", ha="center", va="center", transform=self.ax_stack.transAxes)
+        self.ax_pie.set_title("Domain comparison (total loss)")
+        self.ax_pie.text(0.5, 0.5, "Run prediction to view chart", ha="center", va="center", transform=self.ax_pie.transAxes)
+        self.fig.tight_layout()
+        self.canvas.draw_idle()
+
+    def _render_charts(self, results: Dict[str, Dict[str, float]]) -> None:
+        domains = [d for d in ["simulation_domain", "experiment_domain"] if d in results]
+        if not domains:
+            self._draw_empty_charts()
+            return
+
+        self.ax_stack.clear()
+        self.ax_pie.clear()
+
+        colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+        x = np.arange(len(domains))
+        bottoms = np.zeros(len(domains), dtype=float)
+        for idx, comp in enumerate(self.cfg.component_cols):
+            vals = np.array([results[d][comp] for d in domains], dtype=float)
+            self.ax_stack.bar(x, vals, bottom=bottoms, label=comp, color=colors[idx % len(colors)], width=0.55)
+            bottoms += vals
+
+        self.ax_stack.set_xticks(x, domains)
+        self.ax_stack.set_ylabel("Loss (W)")
+        self.ax_stack.set_title("Stacked component losses by domain")
+        self.ax_stack.legend(loc="upper left", fontsize=9)
+
+        if len(domains) == 2:
+            diff = results["experiment_domain"][self.cfg.total_col] - results["simulation_domain"][self.cfg.total_col]
+            self.ax_stack.text(
+                0.02,
+                0.98,
+                f"Total difference (exp-sim): {diff:+.4f} W",
+                transform=self.ax_stack.transAxes,
+                ha="left",
+                va="top",
+                fontsize=10,
+                bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "gray"},
+            )
+
+        pie_values = [results[d][self.cfg.total_col] for d in domains]
+        pie_labels = [f"{d} ({v:.2f}W)" for d, v in zip(domains, pie_values)]
+        self.ax_pie.pie(pie_values, labels=pie_labels, autopct="%1.1f%%", startangle=90)
+        self.ax_pie.set_title("Total loss share by domain")
+
+        self.fig.tight_layout()
+        self.canvas.draw_idle()
 
     def _build_path_row(self, parent, key: str, label_text: str, row: int) -> None:
         ttk.Label(parent, text=label_text, width=28).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
@@ -204,6 +306,7 @@ class LossPredictorGUI:
             v.set("0")
         for item in self.table.get_children():
             self.table.delete(item)
+        self._draw_empty_charts()
 
     def on_predict(self) -> None:
         if self.scaler is None or not self.models:
@@ -211,12 +314,22 @@ class LossPredictorGUI:
             return
 
         try:
-            values = [float(self.entries[col].get().strip()) for col in self.cfg.input_cols]
+            value_map = {col: float(self.entries[col].get().strip()) for col in self.cfg.input_cols}
         except ValueError:
             messagebox.showerror("Invalid Input", "Please enter valid numeric values for all inputs.")
             return
 
+        in_scope, msg = validate_inputs(value_map)
+        if not in_scope:
+            for item in self.table.get_children():
+                self.table.delete(item)
+            self._draw_empty_charts()
+            self.status.config(text=f"Out of scope: {msg}")
+            messagebox.showwarning("Out of Scope", msg)
+            return
+
         try:
+            values = [value_map[col] for col in self.cfg.input_cols]
             results = predict_row(self.models, self.scaler, values, self.cfg, self.device)
         except Exception as exc:
             messagebox.showerror("Prediction Error", str(exc))
@@ -231,6 +344,16 @@ class LossPredictorGUI:
             row = results[domain_name]
             vals = [domain_name] + [f"{row[name]:.6f}" for name in self.cfg.component_cols + [self.cfg.total_col]]
             self.table.insert("", tk.END, values=vals)
+
+        self._render_charts(results)
+
+        if "simulation_domain" in results and "experiment_domain" in results:
+            sim = results["simulation_domain"][self.cfg.total_col]
+            exp = results["experiment_domain"][self.cfg.total_col]
+            rel = ((exp - sim) / max(abs(sim), 1e-8)) * 100.0
+            self.status.config(text=f"Predicted totals -> simulation: {sim:.4f} W, experiment: {exp:.4f} W, difference: {exp-sim:+.4f} W ({rel:+.2f}%).")
+        else:
+            self.status.config(text="Prediction complete for available domain(s).")
 
 
 def parse_args() -> argparse.Namespace:

@@ -59,6 +59,7 @@ python -m src.experiments --output outputs/experiments/metrics.json
 ```
 
 Launch GUI for single-sample prediction (both simulation and experiment domains):
+- Input scope: Vin[200,450], Vo[200,800], Vin<Vo, D1/D2[0,1], DT[0,0.03], Fs[20000,100000], Po[100,7000].
 
 ```bash
 python -m src.gui_app
@@ -71,6 +72,7 @@ python -m src.gui_app --scaler-path path/to/scaler.joblib --simulation-ckpt path
 ```
 
 The GUI now starts even if artifacts are missing; use the built-in file pickers and **Load Artifacts** button.
+It also enforces input scope checks and draws a stacked bar chart + pie chart to compare simulation and experiment domains.
 
 If your IDE runs files directly (for example PyCharm), this also works:
 
