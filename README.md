@@ -48,7 +48,7 @@ python -m src.train
 Optional arguments:
 
 ```bash
-python -m src.train --epochs-pretrain 400 --epochs-finetune 400 --lr 1e-3 --batch-size 32
+python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 256
 ```
 
 Run baseline + ablations:
@@ -56,6 +56,20 @@ Run baseline + ablations:
 ```bash
 python -m src.experiments --output outputs/experiments/metrics.json
 ```
+
+Launch GUI for single-sample prediction (both simulation and experiment domains):
+
+```bash
+python -m src.gui_app
+```
+
+Optional: pass artifact paths explicitly (useful if `outputs/` is elsewhere):
+
+```bash
+python -m src.gui_app --scaler-path path/to/scaler.joblib --simulation-ckpt path/to/best_pretrained.pt --experiment-ckpt path/to/best_finetuned.pt
+```
+
+The GUI now starts even if artifacts are missing; use the built-in file pickers and **Load Artifacts** button.
 
 If your IDE runs files directly (for example PyCharm), this also works:
 

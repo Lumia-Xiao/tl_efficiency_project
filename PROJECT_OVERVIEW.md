@@ -24,6 +24,7 @@ The model predicts component losses and computes total loss as their sum, so the
 - `src/train.py`: CLI, seed setup, source pretraining loop, source+target fine-tuning loop, early stopping, artifact writing.
 - `src/experiments.py`: runs baseline and ablation studies to quantify gains from transfer + component supervision.
 - `src/evaluate.py`: regression metrics, batch prediction collection, JSON metrics persistence, and plotting utilities.
+- `src/gui_app.py`: Tkinter GUI that takes Vin/Vo/D1/D2/DT/Fs/Po and predicts PIron/PCond/PCopp/PSw/Ploss for simulation and experiment checkpoints, with artifact path selectors when defaults are missing.
 
 ## Notable design choices
 - **Constraint by construction**: `total = sum(components)` is implemented in the forward pass.
