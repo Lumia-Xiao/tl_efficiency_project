@@ -28,6 +28,7 @@ During target-domain training, only the total loss is supervised.
 - `src/train.py`: source pretraining + target weakly supervised fine-tuning
 - `src/experiments.py`: baseline and ablation experiments for method comparison
 - `src/evaluate.py`: metrics and plotting helpers
+- `src/gui_app.py`: desktop GUI for dual-domain component prediction
 - `data/`: CSV files
 - `outputs/`: checkpoints, metrics, figures
 
@@ -55,6 +56,12 @@ Run baseline + ablations:
 
 ```bash
 python -m src.experiments --output outputs/experiments/metrics.json
+```
+
+Launch GUI for single-sample prediction (both simulation and experiment domains):
+
+```bash
+python -m src.gui_app
 ```
 
 If your IDE runs files directly (for example PyCharm), this also works:
