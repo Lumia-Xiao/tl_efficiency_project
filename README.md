@@ -64,6 +64,14 @@ Launch GUI for single-sample prediction (both simulation and experiment domains)
 python -m src.gui_app
 ```
 
+Optional: pass artifact paths explicitly (useful if `outputs/` is elsewhere):
+
+```bash
+python -m src.gui_app --scaler-path path/to/scaler.joblib --simulation-ckpt path/to/best_pretrained.pt --experiment-ckpt path/to/best_finetuned.pt
+```
+
+The GUI now starts even if artifacts are missing; use the built-in file pickers and **Load Artifacts** button.
+
 If your IDE runs files directly (for example PyCharm), this also works:
 
 ```bash
