@@ -1,4 +1,4 @@
-# Transformer Efficiency Transfer Learning Project
+# Power Converter Efficiency Transfer Learning Project
 
 This PyCharm-ready project implements **component prediction + sum constraint** for converter loss estimation.
 
@@ -30,7 +30,8 @@ During target-domain training, only the total loss is supervised.
 - `src/evaluate.py`: metrics and plotting helpers
 - `data/`: CSV files
 - `outputs/`: checkpoints, metrics, figures
-
+- `src/gui_app.py`: Tkinter GUI that takes Vin/Vo/D1/D2/DT/Fs/Po and predicts PIron/PCond/PCopp/PSw/Ploss for simulation and experiment checkpoints, with artifact path selectors when defaults are missing.
+- 
 ## Run
 
 Create a virtual environment and install:
