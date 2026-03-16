@@ -1,21 +1,21 @@
-# 6.6 kW Buck-Boost Power Converter Efficiency Transfer Learning Project
+# Power Converter Efficiency Transfer Learning Project
 
 This PyCharm-ready project implements **component prediction + sum constraint** for converter loss estimation.
 
 ## Problem setting
 
 - **Source domain**: abundant simulation/calculation data with component-level loss labels
-  - Inputs: `Vin, Vo, D1, D2, DT, Fs, Po`
-  - Component labels: `PIron, PCond, PCopp, PSw`
-  - Total loss: `Ploss`
+  - Inputs: `Vlv, Vhv, D, fsw, deadtime_s, Pout`
+  - Component labels: `PCond, PSw, Pcore, PCopp`
+  - Total loss: `PTotal`
 - **Target domain**: limited experimental data with only total loss label
-  - Inputs: `Vin, Vo, D1, D2, DT, Fs, Po`
-  - Total label: `Ploss`
+  - Inputs: `Vlv, Vhv, D, fsw, deadtime_s, Pout`
+  - Total label: `PTotal`
 
 The model predicts each source-domain loss component and enforces:
 
 ```math
-\hat P_{loss}=\hat P_{Iron}+\hat P_{Cond}+\hat P_{Copp}+\hat P_{Sw}
+\hat P_{Total}=\hat P_{Cond}+\hat P_{Sw}+\hat P_{Core}+\hat P_{Copp}
 ```
 
 During target-domain training, only the total loss is supervised.
@@ -30,8 +30,7 @@ During target-domain training, only the total loss is supervised.
 - `src/evaluate.py`: metrics and plotting helpers
 - `data/`: CSV files
 - `outputs/`: checkpoints, metrics, figures
-- `src/gui_app.py`: Tkinter GUI that takes Vin/Vo/D1/D2/DT/Fs/Po and predicts PIron/PCond/PCopp/PSw/Ploss for simulation and experiment checkpoints, with artifact path selectors when defaults are missing.
-- 
+- `src/gui_app.py`: Tkinter GUI that takes Vlv/Vhv/D/fsw/deadtime_s/Pout and predicts PCond/PSw/Pcore/PCopp/PTotal for simulation and experiment checkpoints, with artifact path selectors when defaults are missing.
 ## Run
 
 Create a virtual environment and install:
@@ -49,7 +48,7 @@ python -m src.train
 Optional arguments:
 
 ```bash
-python -m src.train --epochs-pretrain 300 --epochs-finetune 400 --lr 1e-3 --batch-size 256
+python -m src.train --epochs-pretrain 300 --epochs-finetune 100 --lr 1e-3 --batch-size 32
 ```
 
 Run baseline + ablations:

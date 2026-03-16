@@ -31,14 +31,33 @@ from src.model import ComponentSumModel
 
 
 INPUT_BOUNDS: Dict[str, Tuple[float, float]] = {
-    "Vin": (200.0, 450.0),
-    "Vo": (200.0, 800.0),
-    "D1": (0.0, 1.0),
-    "D2": (0.0, 1.0),
-    "DT": (0.0, 0.03),
-    "Fs": (20000.0, 100000.0),
-    "Po": (100.0, 7000.0),
+    "Vlv": (300.0, 500.0),
+    "Vhv": (600.0, 800.0),
+    "D": (0.0, 1.0),
+    "fsw": (50000.0, 100000.0),
+    "deadtime_s": (2e-7, 4e-7),
+    "Pout": (-20000.0, 20000.0),
 }
+
+
+
+def _format_bound(value: float) -> str:
+    if abs(value) >= 1000:
+        return f"{value:g}"
+    if 0 < abs(value) < 1e-3:
+        return f"{value:.1e}"
+    return f"{value:g}"
+
+
+def _default_for_input(col: str) -> str:
+    low, high = INPUT_BOUNDS.get(col, (0.0, 0.0))
+    default = (low + high) / 2.0 if high > low else 0.0
+    return f"{default:g}"
+
+
+def _range_text(col: str) -> str:
+    low, high = INPUT_BOUNDS.get(col, (0.0, 0.0))
+    return f"[{_format_bound(low)}, {_format_bound(high)}]"
 
 @dataclass
 class LoadedModel:
@@ -97,8 +116,8 @@ def validate_inputs(values: Dict[str, float]) -> tuple[bool, str]:
         if value < low or value > high:
             return False, f"{key}={value} is out of scope. Allowed range: [{low}, {high}]"
 
-    if values["Vin"] >= values["Vo"]:
-        return False, f"Input is out of scope: require Vin < Vo, but got Vin={values['Vin']}, Vo={values['Vo']}."
+    if values["Vlv"] >= values["Vhv"]:
+        return False, f"Input is out of scope: require Vlv < Vhv, but got Vlv={values['Vlv']}, Vhv={values['Vhv']}."
 
     return True, ""
 
@@ -125,7 +144,7 @@ class LossPredictorGUI:
         self.root = root
         self.cfg = cfg
         self.device = device
-        self.root.title("Transformer Loss Component Predictor")
+        self.root.title("Buck-Boost Converter Loss Predictor")
         self.root.geometry("1300x860")
 
         self._configure_fonts()
@@ -146,7 +165,7 @@ class LossPredictorGUI:
         info = ttk.Label(
             top,
             text=(
-                "Input range limits: Vin[200,450], Vo[200,800], Vin<Vo, D1/D2[0,1], DT[0,0.03], Fs[20000,100000], Po[100,7000].\n"
+                "Input range limits: Vlv[300,500], Vhv[600,800], Vlv<Vhv, D[0,1], fsw[50000,100000], deadtime_s[2e-7,4e-7], Pout[-20000,20000].\n"
                 "If any input is out of scope, prediction is blocked and marked as out of scope."
             ),
             justify=tk.LEFT,
@@ -171,8 +190,9 @@ class LossPredictorGUI:
             field = ttk.Frame(form)
             field.grid(row=0, column=idx, sticky="w", padx=8, pady=(4, 8))
             ttk.Label(field, text=col, width=8).pack(anchor="w")
-            var = tk.StringVar(value="0")
+            var = tk.StringVar(value=_default_for_input(col))
             ttk.Entry(field, textvariable=var, width=14).pack(anchor="w", pady=(2, 0))
+            ttk.Label(field, text=f"range: {_range_text(col)}", foreground="#555555").pack(anchor="w")
             self.entries[col] = var
 
         btn_frame = ttk.Frame(top)
@@ -348,8 +368,8 @@ class LossPredictorGUI:
                 messagebox.showinfo("Artifacts Loaded", "All artifacts loaded successfully.")
 
     def on_clear(self) -> None:
-        for v in self.entries.values():
-            v.set("0")
+        for col, v in self.entries.items():
+            v.set(_default_for_input(col))
         for item in self.table.get_children():
             self.table.delete(item)
         self._draw_empty_charts()
@@ -403,7 +423,7 @@ class LossPredictorGUI:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="GUI for transformer loss component prediction.")
+    parser = argparse.ArgumentParser(description="GUI for buck-boost converter loss component prediction.")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--scaler-path", type=str, default=None)
     parser.add_argument("--simulation-ckpt", type=str, default=None)
