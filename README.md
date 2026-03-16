@@ -1,4 +1,4 @@
-# Power Converter Efficiency Transfer Learning Project
+# 6.6 kW Buck-Boost Power Converter Efficiency Transfer Learning Project
 
 This PyCharm-ready project implements **component prediction + sum constraint** for converter loss estimation.
 
