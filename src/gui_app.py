@@ -286,7 +286,7 @@ class LossPredictorGUI:
         self.ax_bar.set_title("Component losses by domain")
         self.ax_bar.legend(
             loc="upper left",
-            bbox_to_anchor=(0.01, 0.85),
+            bbox_to_anchor=(0.00, 0.85),
             ncol=1 if len(domains) <= 2 else int(np.ceil(len(domains) / 2)),
             fontsize=10,
             frameon=True,
@@ -297,7 +297,7 @@ class LossPredictorGUI:
             exp_total = results["experiment_domain"][self.cfg.total_col]
             diff = exp_total - sim_total
             self.ax_bar.text(
-                0.01,
+                0.02,
                 0.90,
                 f"Exp-Sim: {diff:+.4f} W",
                 transform=self.ax_bar.transAxes,
