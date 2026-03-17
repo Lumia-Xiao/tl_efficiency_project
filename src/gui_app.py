@@ -144,7 +144,7 @@ class LossPredictorGUI:
         self.root = root
         self.cfg = cfg
         self.device = device
-        self.root.title("Buck-Boost Converter Loss Predictor")
+        self.root.title("20-kW Buck-Boost Converter Loss Predictor")
         self.root.geometry("1300x860")
 
         self._configure_fonts()
@@ -159,7 +159,7 @@ class LossPredictorGUI:
         self.models: List[LoadedModel] = []
         self.scaler = None
 
-        top = ttk.Frame(root, padding=14)
+        top = ttk.Frame(root, padding=4)
         top.pack(fill=tk.BOTH, expand=True)
 
         info = ttk.Label(
@@ -170,48 +170,48 @@ class LossPredictorGUI:
             ),
             justify=tk.LEFT,
         )
-        info.pack(anchor=tk.W, pady=(0, 10))
+        info.pack(anchor=tk.W, pady=(0, 2))
 
-        path_frame = ttk.LabelFrame(top, text="Model Artifacts", padding=8)
-        path_frame.pack(fill=tk.X, pady=(0, 10))
+        path_frame = ttk.LabelFrame(top, text="Model Artifacts", padding=2)
+        path_frame.pack(fill=tk.X, pady=(0, 2))
         self.path_vars: Dict[str, tk.StringVar] = {}
 
         self._build_path_row(path_frame, "scaler", "Scaler (.joblib)", 0)
         self._build_path_row(path_frame, "simulation_domain", "Simulation checkpoint (.pt)", 1)
         self._build_path_row(path_frame, "experiment_domain", "Experiment checkpoint (.pt)", 2)
 
-        ttk.Button(path_frame, text="Load Artifacts", command=self.on_load_artifacts).grid(row=3, column=2, sticky="e", pady=(8, 0))
+        ttk.Button(path_frame, text="Load Artifacts", command=self.on_load_artifacts).grid(row=3, column=2, sticky="e", pady=(2, 0))
 
-        form = ttk.LabelFrame(top, text="Inputs", padding=8)
+        form = ttk.LabelFrame(top, text="Inputs", padding=2)
         form.pack(fill=tk.X)
 
         self.entries: Dict[str, tk.StringVar] = {}
         for idx, col in enumerate(cfg.input_cols):
             field = ttk.Frame(form)
-            field.grid(row=0, column=idx, sticky="w", padx=8, pady=(4, 8))
-            ttk.Label(field, text=col, width=8).pack(anchor="w")
+            field.grid(row=0, column=idx, sticky="w", padx=4, pady=(2, 4))
+            ttk.Label(field, text=col, width=4).pack(anchor="w")
             var = tk.StringVar(value=_default_for_input(col))
             ttk.Entry(field, textvariable=var, width=14).pack(anchor="w", pady=(2, 0))
             ttk.Label(field, text=f"range: {_range_text(col)}", foreground="#555555").pack(anchor="w")
             self.entries[col] = var
 
         btn_frame = ttk.Frame(top)
-        btn_frame.pack(fill=tk.X, pady=(8, 8))
+        btn_frame.pack(fill=tk.X, pady=(4, 4))
         self.predict_btn = ttk.Button(btn_frame, text="Predict", command=self.on_predict)
         self.predict_btn.pack(side=tk.LEFT)
-        ttk.Button(btn_frame, text="Clear", command=self.on_clear).pack(side=tk.LEFT, padx=8)
+        ttk.Button(btn_frame, text="Clear", command=self.on_clear).pack(side=tk.LEFT, padx=4)
 
         columns = ["domain"] + cfg.component_cols + [cfg.total_col]
-        self.table = ttk.Treeview(top, columns=columns, show="headings", height=5)
+        self.table = ttk.Treeview(top, columns=columns, show="headings", height=2)
         for col in columns:
             self.table.heading(col, text=col)
             self.table.column(col, width=170, anchor=tk.CENTER)
         self.table.pack(fill=tk.X, expand=False)
 
         chart_frame = ttk.Frame(top)
-        chart_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        chart_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
 
-        self.fig = Figure(figsize=(14.5, 4.8), dpi=100)
+        self.fig = Figure(figsize=(16, 4.8), dpi=100)
         self.ax_bar = self.fig.add_subplot(1, 3, 1)
         self.ax_pie_sim = self.fig.add_subplot(1, 3, 2)
         self.ax_pie_exp = self.fig.add_subplot(1, 3, 3)
@@ -220,18 +220,18 @@ class LossPredictorGUI:
         self._draw_empty_charts()
 
         self.status = ttk.Label(top, text="")
-        self.status.pack(anchor=tk.W, pady=(8, 0))
+        self.status.pack(anchor=tk.W, pady=(4, 0))
 
         self.on_load_artifacts(show_dialog=False)
 
     def _configure_fonts(self) -> None:
-        self.root.option_add("*Font", "SegoeUI 11")
+        self.root.option_add("*Font", "SegoeUI 12")
         style = ttk.Style()
-        style.configure("Treeview", rowheight=28, font=("SegoeUI", 11))
-        style.configure("Treeview.Heading", font=("SegoeUI", 11, "bold"))
-        style.configure("TLabel", font=("SegoeUI", 11))
-        style.configure("TButton", font=("SegoeUI", 11))
-        style.configure("TLabelframe.Label", font=("SegoeUI", 11, "bold"))
+        style.configure("Treeview", rowheight=28, font=("SegoeUI", 12))
+        style.configure("Treeview.Heading", font=("SegoeUI", 12, "bold"))
+        style.configure("TLabel", font=("SegoeUI", 12))
+        style.configure("TButton", font=("SegoeUI", 12))
+        style.configure("TLabelframe.Label", font=("SegoeUI", 12, "bold"))
 
     def _draw_empty_charts(self) -> None:
         self.ax_bar.clear()
@@ -279,7 +279,7 @@ class LossPredictorGUI:
             vals = np.array([results[domain][comp] for comp in components], dtype=float)
             bars = self.ax_bar.bar(x + offsets[idx], vals, width=width, label=domain_labels.get(domain, domain),
                                    alpha=0.9)
-            self.ax_bar.bar_label(bars, labels=[f"{v:.3f}" for v in vals], padding=2, fontsize=10)
+            self.ax_bar.bar_label(bars, labels=[f"{v:.3f}" for v in vals], padding=2, fontsize=12)
 
         self.ax_bar.set_xticks(x, components)
         self.ax_bar.set_ylabel("Loss (W)")
@@ -288,7 +288,7 @@ class LossPredictorGUI:
             loc="upper left",
             bbox_to_anchor=(0.00, 0.85),
             ncol=1 if len(domains) <= 2 else int(np.ceil(len(domains) / 2)),
-            fontsize=10,
+            fontsize=12,
             frameon=True,
         )
 
@@ -303,7 +303,7 @@ class LossPredictorGUI:
                 transform=self.ax_bar.transAxes,
                 ha="left",
                 va="bottom",
-                fontsize=10,
+                fontsize=12,
                 bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "gray"},
             )
 
