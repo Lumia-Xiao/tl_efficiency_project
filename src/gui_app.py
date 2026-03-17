@@ -287,7 +287,7 @@ class LossPredictorGUI:
         self.ax_bar.legend(
             loc="upper left",
             bbox_to_anchor=(0.01, 0.85),
-            ncol=max(1, len(domains)),
+            ncol=1 if len(domains) <= 2 else int(np.ceil(len(domains) / 2)),
             fontsize=10,
             frameon=True,
         )
@@ -299,7 +299,7 @@ class LossPredictorGUI:
             self.ax_bar.text(
                 0.01,
                 0.90,
-                f"Total difference (exp-sim): {diff:+.4f} W",
+                f"Exp-Sim: {diff:+.4f} W",
                 transform=self.ax_bar.transAxes,
                 ha="left",
                 va="bottom",
