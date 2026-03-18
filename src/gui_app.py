@@ -145,7 +145,7 @@ class LossPredictorGUI:
         self.cfg = cfg
         self.device = device
         self.root.title("20-kW Buck-Boost Converter Loss Predictor")
-        self.root.geometry("1300x860")
+        self.root.geometry("1230x880")
 
         self._configure_fonts()
 
@@ -212,9 +212,8 @@ class LossPredictorGUI:
         chart_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
 
         self.fig = Figure(figsize=(16, 4.8), dpi=100)
-        self.ax_bar = self.fig.add_subplot(1, 3, 1)
-        self.ax_pie_sim = self.fig.add_subplot(1, 3, 2)
-        self.ax_pie_exp = self.fig.add_subplot(1, 3, 3)
+        self.ax_pie_sim = self.fig.add_subplot(1, 2, 1)
+        self.ax_pie_exp = self.fig.add_subplot(1, 2, 2)
         self.canvas = FigureCanvasTkAgg(self.fig, master=chart_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self._draw_empty_charts()
@@ -234,14 +233,8 @@ class LossPredictorGUI:
         style.configure("TLabelframe.Label", font=("SegoeUI", 12, "bold"))
 
     def _draw_empty_charts(self) -> None:
-        self.ax_bar.clear()
         self.ax_pie_sim.clear()
         self.ax_pie_exp.clear()
-
-        self.ax_bar.set_title("Component losses by domain")
-        self.ax_bar.set_ylabel("Loss (W)")
-        self.ax_bar.text(0.5, 0.5, "Run prediction to view chart", ha="center", va="center",
-                         transform=self.ax_bar.transAxes)
 
         self.ax_pie_sim.set_title("Simulation component share")
         self.ax_pie_sim.text(0.5, 0.5, "Run prediction to view chart", ha="center", va="center",
@@ -259,53 +252,11 @@ class LossPredictorGUI:
             self._draw_empty_charts()
             return
 
-        self.ax_bar.clear()
         self.ax_pie_sim.clear()
         self.ax_pie_exp.clear()
 
         colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
         components = self.cfg.component_cols
-        x = np.arange(len(components))
-        domain_labels = {
-            "simulation_domain": "simulation",
-            "experiment_domain": "experiment",
-        }
-
-        n_domains = len(domains)
-        width = 0.38 if n_domains == 2 else 0.55
-        offsets = np.linspace(-width * (n_domains - 1) / 2, width * (n_domains - 1) / 2, n_domains)
-
-        for idx, domain in enumerate(domains):
-            vals = np.array([results[domain][comp] for comp in components], dtype=float)
-            bars = self.ax_bar.bar(x + offsets[idx], vals, width=width, label=domain_labels.get(domain, domain),
-                                   alpha=0.9)
-            self.ax_bar.bar_label(bars, labels=[f"{v:.3f}" for v in vals], padding=2, fontsize=12)
-
-        self.ax_bar.set_xticks(x, components)
-        self.ax_bar.set_ylabel("Loss (W)")
-        self.ax_bar.set_title("Component losses by domain")
-        self.ax_bar.legend(
-            loc="upper left",
-            bbox_to_anchor=(0.00, 0.85),
-            ncol=1 if len(domains) <= 2 else int(np.ceil(len(domains) / 2)),
-            fontsize=12,
-            frameon=True,
-        )
-
-        if len(domains) == 2:
-            sim_total = results["simulation_domain"][self.cfg.total_col]
-            exp_total = results["experiment_domain"][self.cfg.total_col]
-            diff = exp_total - sim_total
-            self.ax_bar.text(
-                0.02,
-                0.90,
-                f"Exp-Sim: {diff:+.4f} W",
-                transform=self.ax_bar.transAxes,
-                ha="left",
-                va="bottom",
-                fontsize=12,
-                bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "gray"},
-            )
 
         def draw_component_pie(ax, domain: str, title: str) -> None:
             if domain not in results:
