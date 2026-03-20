@@ -45,6 +45,7 @@ class DataBundle:
     target_val_df: pd.DataFrame
     scaler: StandardScaler
     relation_prior: Dict[str, np.ndarray]
+    relation_bank: Dict[str, np.ndarray]
 
 
 def load_csvs(cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -62,6 +63,8 @@ def load_csvs(cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 def split_and_scale(cfg: Config) -> DataBundle:
     src_df, tgt_df = load_csvs(cfg)
+    if cfg.target_subset_size is not None and 0 < cfg.target_subset_size < len(tgt_df):
+        tgt_df = tgt_df.sample(n=cfg.target_subset_size, random_state=cfg.random_seed).reset_index(drop=True)
 
     src_train_df, src_val_df = train_test_split(
         src_df,
@@ -106,6 +109,7 @@ def split_and_scale(cfg: Config) -> DataBundle:
         shuffle=False,
     )
     relation_prior = build_relation_prior(src_train_df, cfg)
+    relation_bank = build_relation_bank(src_train_df, scaler, cfg)
 
     return DataBundle(
         source_train_loader=source_train_loader,
@@ -118,6 +122,7 @@ def split_and_scale(cfg: Config) -> DataBundle:
         target_val_df=tgt_val_df,
         scaler=scaler,
         relation_prior=relation_prior,
+        relation_bank=relation_bank,
     )
 
 
@@ -130,11 +135,27 @@ def build_relation_prior(df: pd.DataFrame, cfg: Config) -> Dict[str, np.ndarray]
     clr_mean = clr.mean(axis=0).astype(np.float32)
     clr_centered = clr - clr_mean
     clr_cov = (clr_centered.T @ clr_centered / max(len(clr) - 1, 1)).astype(np.float32)
+    clr_var = np.clip(np.diag(clr_cov), cfg.relation_eps, None).astype(np.float32)
     share_mean = share.mean(axis=0).astype(np.float32)
     return {
         "clr_mean": clr_mean,
         "clr_cov": clr_cov,
+        "clr_var": clr_var,
         "share_mean": share_mean,
+    }
+
+
+def build_relation_bank(df: pd.DataFrame, scaler: StandardScaler, cfg: Config) -> Dict[str, np.ndarray]:
+    x = scaler.transform(df[cfg.input_cols].to_numpy(dtype=np.float32)).astype(np.float32)
+    comp = df[cfg.component_cols].to_numpy(dtype=np.float32)
+    total = np.clip(comp.sum(axis=1, keepdims=True), cfg.relation_eps, None)
+    share = np.clip(comp / total, cfg.relation_eps, None)
+    log_share = np.log(share)
+    clr = (log_share - log_share.mean(axis=1, keepdims=True)).astype(np.float32)
+    return {
+        "x": x,
+        "clr": clr,
+        "share": share.astype(np.float32),
     }
 
 

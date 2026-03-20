@@ -19,13 +19,13 @@ if __package__ in {None, ""}:
     from src.data_utils import split_and_scale
     from src.evaluate import collect_predictions, regression_metrics, save_metrics
     from src.model import ComponentSumModel
-    from src.train import EarlyStopper, build_loss, build_relation_prior_tensors, run_source_epoch, run_target_epoch
+    from src.train import EarlyStopper, build_loss, build_relation_prior_tensors, build_relation_bank_tensors, run_source_epoch, run_target_epoch
 else:
     from .config import Config
     from .data_utils import split_and_scale
     from .evaluate import collect_predictions, regression_metrics, save_metrics
     from .model import ComponentSumModel
-    from .train import EarlyStopper, build_loss, build_relation_prior_tensors, run_source_epoch, run_target_epoch
+    from .train import EarlyStopper, build_loss, build_relation_prior_tensors, build_relation_bank_tensors, run_source_epoch, run_target_epoch
 
 
 class TotalOnlyMLP(nn.Module):
@@ -102,6 +102,7 @@ def evaluate_component_model(model: nn.Module, data, cfg: Config) -> Dict:
 def train_component_transfer(cfg: Config, do_pretrain: bool = True, do_finetune: bool = True) -> Tuple[Dict, Dict]:
     data = split_and_scale(cfg)
     relation_prior = build_relation_prior_tensors(data.relation_prior, cfg.device)
+    relation_bank = build_relation_bank_tensors(data.relation_bank, cfg.device)
     model = ComponentSumModel(
         in_dim=len(cfg.input_cols),
         num_components=len(cfg.component_cols),
@@ -138,11 +139,11 @@ def train_component_transfer(cfg: Config, do_pretrain: bool = True, do_finetune:
         for epoch in range(1, cfg.epochs_finetune + 1):
             run_target_epoch(
                 model, data.source_train_loader, data.target_train_loader, optimizer, cfg.device, loss_fn, cfg,
-                relation_prior, train=True, epoch=epoch, total_epochs=cfg.epochs_finetune
+                relation_prior, relation_bank, train=True, epoch=epoch, total_epochs=cfg.epochs_finetune
             )
             val_stats = run_target_epoch(
                 model, data.source_val_loader, data.target_val_loader, optimizer, cfg.device, loss_fn, cfg,
-                relation_prior, train=False, epoch=epoch, total_epochs=cfg.epochs_finetune
+                relation_prior, relation_bank, train=False, epoch=epoch, total_epochs=cfg.epochs_finetune
             )
             if stopper.step(val_stats["loss"], model):
                 break
@@ -182,19 +183,13 @@ def train_ablation_no_source_relation(cfg: Config) -> Tuple[Dict, Dict]:
     return metrics, meta
 
 
-def train_ablation_no_target_relation_prior(cfg: Config) -> Tuple[Dict, Dict]:
-    ab_cfg = replace(cfg, lambda_tgt_relation_mean=0.0, lambda_tgt_relation_cov=0.0)
-    metrics, meta = train_proposed(ab_cfg)
-    meta["name"] = "ablation_no_target_relation_prior"
-    meta["uses_target_relation_prior"] = False
-    return metrics, meta
-
-
 def train_ablation_no_relation_learning(cfg: Config) -> Tuple[Dict, Dict]:
     ab_cfg = replace(
         cfg,
         lambda_src_relation=0.0,
         lambda_src_relation_finetune=0.0,
+        lambda_tgt_relation_local=0.0,
+        lambda_tgt_relation_sample=0.0,
         lambda_tgt_relation_mean=0.0,
         lambda_tgt_relation_cov=0.0,
     )
@@ -215,6 +210,8 @@ def train_ablation_no_source_transfer(cfg: Config) -> Tuple[Dict, Dict]:
         lambda_src_components_finetune=0.0,
         lambda_src_total_finetune=0.0,
         lambda_src_relation_finetune=0.0,
+        lambda_tgt_relation_local=0.0,
+        lambda_tgt_relation_sample=0.0,
         lambda_tgt_relation_mean=0.0,
         lambda_tgt_relation_cov=0.0,
     )
@@ -282,6 +279,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--patience", type=int, default=25)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="cpu")
+    parser.add_argument("--target-subset-size", type=int, default=None)
     return parser.parse_args()
 
 
@@ -292,6 +290,7 @@ def main() -> None:
         epochs_pretrain=args.epochs_pretrain,
         epochs_finetune=args.epochs_finetune,
         early_stop_patience=args.patience,
+        target_subset_size=args.target_subset_size,
         random_seed=args.seed,
         device=args.device,
     )
@@ -307,7 +306,6 @@ def main() -> None:
         ("source_only_no_target_adaptation", train_source_only_no_target_adaptation),
         ("ablation_no_component_supervision", train_ablation_no_component_supervision),
         ("ablation_no_source_relation", train_ablation_no_source_relation),
-        ("ablation_no_target_relation_prior", train_ablation_no_target_relation_prior),
         ("ablation_no_relation_learning", train_ablation_no_relation_learning),
         ("proposed", train_proposed),
     ]
@@ -332,6 +330,7 @@ def main() -> None:
     source_only_rmse = results["source_only_no_target_adaptation"]["metrics"]["target_val_total"]["RMSE"]
     no_relation_rmse = results["ablation_no_relation_learning"]["metrics"]["target_val_total"]["RMSE"]
     results["summary"] = {
+        "target_subset_size": cfg.target_subset_size,
         "target_rmse_improvement_vs_baseline_pct": (base_rmse - prop_rmse) / max(base_rmse, 1e-12) * 100.0,
         "target_rmse_improvement_vs_no_source_transfer_pct": (no_transfer_rmse - prop_rmse) / max(no_transfer_rmse, 1e-12) * 100.0,
         "target_rmse_improvement_vs_source_only_pct": (source_only_rmse - prop_rmse) / max(source_only_rmse, 1e-12) * 100.0,

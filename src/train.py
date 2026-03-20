@@ -97,16 +97,32 @@ def source_component_supervision_loss(
 
 
 def target_relation_prior_loss(
-    pred_components: torch.Tensor, relation_prior: Dict[str, torch.Tensor], cfg: Config, scale: float = 1.0
+    pred_components: torch.Tensor,
+    relation_prior: Dict[str, torch.Tensor],
+    cfg: Config,
+    scale: float = 1.0,
+    local_prior: Dict[str, torch.Tensor] | None = None
 ) -> Dict[str, torch.Tensor]:
     share, pred_clr = components_to_share_and_clr(pred_components, cfg.relation_eps)
+    sample_loss = (((pred_clr - relation_prior["clr_mean"]) ** 2) / relation_prior["clr_var"]).mean()
     mean_loss = F.smooth_l1_loss(pred_clr.mean(dim=0), relation_prior["clr_mean"])
     cov_loss = F.smooth_l1_loss(batch_covariance(pred_clr), relation_prior["clr_cov"])
     share_loss = F.smooth_l1_loss(share.mean(dim=0), relation_prior["share_mean"])
+    local_loss = pred_clr.new_tensor(0.0)
+    if local_prior is not None:
+        local_loss = (
+            F.smooth_l1_loss(pred_clr, local_prior["clr_mean"])
+            + F.smooth_l1_loss(share, local_prior["share_mean"])
+        )
     return {
         "loss": scale * (
-            cfg.lambda_tgt_relation_mean * (mean_loss + share_loss) + cfg.lambda_tgt_relation_cov * cov_loss
+            cfg.lambda_tgt_relation_local * local_loss
+            + cfg.lambda_tgt_relation_sample * sample_loss
+            + cfg.lambda_tgt_relation_mean * (mean_loss + share_loss)
+            + cfg.lambda_tgt_relation_cov * cov_loss
         ),
+        "local_loss": local_loss,
+        "sample_loss": sample_loss,
         "mean_loss": mean_loss,
         "cov_loss": cov_loss,
         "share_loss": share_loss,
@@ -120,6 +136,30 @@ def build_relation_prior_tensors(relation_prior: Dict[str, np.ndarray], device: 
     }
 
 
+def build_relation_bank_tensors(relation_bank: Dict[str, np.ndarray], device: str) -> Dict[str, torch.Tensor]:
+    return {
+        name: torch.tensor(value, dtype=torch.float32, device=device)
+        for name, value in relation_bank.items()
+    }
+
+
+def compute_local_relation_prior(
+    x: torch.Tensor, relation_bank: Dict[str, torch.Tensor], cfg: Config
+) -> Dict[str, torch.Tensor]:
+    bank_x = relation_bank["x"]
+    bank_clr = relation_bank["clr"]
+    bank_share = relation_bank["share"]
+    k = min(cfg.local_prior_k, bank_x.size(0))
+    distances = torch.cdist(x, bank_x)
+    indices = torch.topk(distances, k=k, largest=False).indices
+    neighbor_clr = bank_clr[indices]
+    neighbor_share = bank_share[indices]
+    return {
+        "clr_mean": neighbor_clr.mean(dim=1),
+        "share_mean": neighbor_share.mean(dim=1),
+    }
+
+
 def get_source_loss_weights(cfg: Config, stage: str, epoch: int | None = None, total_epochs: int | None = None) -> Dict[str, float]:
     if stage == "finetune":
         return {
@@ -129,8 +169,12 @@ def get_source_loss_weights(cfg: Config, stage: str, epoch: int | None = None, t
         }
     component_weight = cfg.lambda_src_components
     if epoch is not None and total_epochs is not None and total_epochs > 0:
-        progress = min(max(epoch / total_epochs, 0.0), 1.0)
-        component_weight = cfg.lambda_src_components * ((1.0 - progress) ** cfg.src_component_decay_power)
+        warmup_epochs = max(2, int(total_epochs * cfg.src_component_warmup_ratio))
+        if epoch >= warmup_epochs:
+            component_weight = 0.0
+        else:
+            progress = min(max((epoch - 1) / warmup_epochs, 0.0), 1.0)
+            component_weight = cfg.lambda_src_components * ((1.0 - progress) ** cfg.src_component_decay_power)
     return {
         "components": component_weight,
         "total": cfg.lambda_src_total,
@@ -197,7 +241,7 @@ def run_source_epoch(
 
 def run_target_epoch(
     model, src_loader, tgt_loader, optimizer, device: str, loss_fn, cfg: Config,
-    relation_prior: Dict[str, torch.Tensor], train: bool = True,
+    relation_prior: Dict[str, torch.Tensor], relation_bank: Dict[str, torch.Tensor], train: bool = True,
     epoch: int | None = None, total_epochs: int | None = None
 ) -> Dict[str, float]:
     model.train() if train else model.eval()
@@ -237,8 +281,9 @@ def run_target_epoch(
         )
         src_relation = src_weights["relation"] * source_relation_loss(out_s["components"], y_comp_s, cfg)
         tgt_loss = cfg.lambda_tgt_total * loss_fn(out_t["total"], y_total_t)
+        local_prior = compute_local_relation_prior(x_t, relation_bank, cfg)
         tgt_relation = target_relation_prior_loss(
-            out_t["components"], relation_prior, cfg, scale=tgt_relation_scale
+            out_t["components"], relation_prior, cfg, scale=tgt_relation_scale, local_prior=local_prior
         )["loss"]
         loss = src_loss + src_relation + tgt_loss + tgt_relation
 
@@ -270,6 +315,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--target-subset-size", type=int, default=None)
     parser.add_argument("--freeze-backbone-in-finetune", action="store_true")
     return parser.parse_args()
 
@@ -287,6 +333,8 @@ def main() -> None:
         cfg.lr = args.lr
     if args.device is not None:
         cfg.device = args.device
+    if args.target_subset_size is not None:
+        cfg.target_subset_size = args.target_subset_size
     if args.freeze_backbone_in_finetune:
         cfg.freeze_backbone_in_finetune = True
 
@@ -298,6 +346,7 @@ def main() -> None:
 
     data = split_and_scale(cfg)
     relation_prior = build_relation_prior_tensors(data.relation_prior, cfg.device)
+    relation_bank = build_relation_bank_tensors(data.relation_bank, cfg.device)
     save_scaler(data.scaler, cfg.output_dir)
 
     model = ComponentSumModel(
@@ -342,11 +391,11 @@ def main() -> None:
     for epoch in range(1, cfg.epochs_finetune + 1):
         train_stats = run_target_epoch(
             model, data.source_train_loader, data.target_train_loader, optimizer, cfg.device, loss_fn, cfg,
-            relation_prior, train=True, epoch=epoch, total_epochs=cfg.epochs_finetune
+            relation_prior, relation_bank, train=True, epoch=epoch, total_epochs=cfg.epochs_finetune
         )
         val_stats = run_target_epoch(
             model, data.source_val_loader, data.target_val_loader, optimizer, cfg.device, loss_fn, cfg,
-            relation_prior, train=False, epoch=epoch, total_epochs=cfg.epochs_finetune
+            relation_prior, relation_bank, train=False, epoch=epoch, total_epochs=cfg.epochs_finetune
         )
         history["finetune"].append({"epoch": epoch, "train": train_stats, "val": val_stats})
         if epoch % 20 == 0 or epoch == 1:
@@ -369,6 +418,7 @@ def main() -> None:
     metrics = {
         "source_val_total": regression_metrics(src_pred["true_total"], src_pred["pred_total"]),
         "target_val_total": regression_metrics(tgt_pred["true_total"], tgt_pred["pred_total"]),
+        "target_subset_size": len(data.target_train_df) + len(data.target_val_df),
     }
     if "true_components" in src_pred:
         comp_metrics = {}

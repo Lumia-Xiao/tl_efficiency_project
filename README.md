@@ -57,6 +57,12 @@ Run baseline + ablations:
 python -m src.experiments --output outputs/experiments/metrics.json
 ```
 
+Retest the comparison with a random 20-sample target-domain subset:
+
+```bash
+python -m src.experiments --target-subset-size 20 --seed 42 --output outputs/experiments/metrics_target20.json
+```
+
 Launch GUI for single-sample prediction (both simulation and experiment domains):
 
 ```bash
@@ -84,7 +90,6 @@ Included comparisons:
 - `source_only_no_target_adaptation`: source-pretrained model evaluated on target without target-domain fine-tuning.
 - `ablation_no_component_supervision`: transfer pipeline with source component loss weight set to 0.
 - `ablation_no_source_relation`: keeps source component labels but removes source-domain relation-consistency learning.
-- `ablation_no_target_relation_prior`: keeps source relation learning but removes target-domain relation-prior regularization.
 - `ablation_no_relation_learning`: removes both source relation learning and target relation prior, leaving only component/value supervision plus sum constraint.
 
 ## Notes

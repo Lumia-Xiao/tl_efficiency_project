@@ -18,6 +18,7 @@ class Config:
 
     source_val_ratio: float = 0.2
     target_val_ratio: float = 0.2
+    target_subset_size: int | None = None
     random_seed: int = 42
 
     batch_size: int = 32
@@ -30,19 +31,23 @@ class Config:
     epochs_finetune: int = 100
     early_stop_patience: int = 40
 
-    lambda_src_components: float = 0.2
+    lambda_src_components: float = 0.15
     lambda_src_total: float = 0.5
-    lambda_src_relation: float = 0.3
+    lambda_src_relation: float = 0.4
     lambda_src_components_finetune: float = 0.0
     lambda_src_total_finetune: float = 0.25
     lambda_src_relation_finetune: float = 0.0
     lambda_tgt_total: float = 1.0
-    lambda_tgt_relation_mean: float = 0.25
+    lambda_tgt_relation_local: float = 0.2
+    lambda_tgt_relation_sample: float = 0.18
+    lambda_tgt_relation_mean: float = 0.3
     lambda_tgt_relation_cov: float = 0.12
     component_share_loss_weight: float = 0.8
     component_norm_loss_weight: float = 0.2
     src_component_decay_power: float = 1.5
+    src_component_warmup_ratio: float = 0.2
     tgt_relation_warmup_epochs: int = 20
+    local_prior_k: int = 32
     relation_eps: float = 1e-6
 
     freeze_backbone_in_finetune: bool = False
