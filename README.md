@@ -18,7 +18,7 @@ The model predicts each source-domain loss component and enforces:
 \hat P_{Total}=\hat P_{Cond}+\hat P_{Sw}+\hat P_{Core}+\hat P_{Copp}
 ```
 
-During target-domain training, only the total loss is supervised.
+During target-domain training, only the total loss is supervised, while the latent 4-component decomposition is additionally regularized by a source-domain relation prior in compositional (`clr/log-ratio`) space.
 
 ## Structure
 
@@ -78,14 +78,19 @@ python src/experiments.py --output outputs/experiments/metrics.json
 ```
 
 Included comparisons:
-- `full_method`: source pretraining + source/target fine-tuning with component supervision.
+- `proposed`: full method with source component supervision, source relation learning, and target relation-prior consistency.
 - `baseline_target_only_total_model`: direct total-loss MLP trained only on target data.
+- `ablation_no_source_transfer`: constrained component-sum model trained on target total labels only, without any source-domain learning.
+- `source_only_no_target_adaptation`: source-pretrained model evaluated on target without target-domain fine-tuning.
 - `ablation_no_component_supervision`: transfer pipeline with source component loss weight set to 0.
-- `ablation_no_source_transfer`: constrained model trained only on target total labels.
+- `ablation_no_source_relation`: keeps source component labels but removes source-domain relation-consistency learning.
+- `ablation_no_target_relation_prior`: keeps source relation learning but removes target-domain relation-prior regularization.
+- `ablation_no_relation_learning`: removes both source relation learning and target relation prior, leaving only component/value supervision plus sum constraint.
 
 ## Notes
 
 1. The scaler is fit on the **source-domain training split only**.
 2. Source-domain validation is used to select the best pretrained model.
-3. Target-domain fine-tuning uses only total-loss supervision.
-4. Component predictions in the target domain are latent but physically constrained to be non-negative and additive.
+3. Source-domain training now also learns the 4-way component relation with a `clr`-space consistency loss, so the model captures co-variation and trade-offs rather than treating components as independent targets.
+4. Target-domain fine-tuning still uses total-loss supervision only, but it also matches the source-domain component relation prior through `clr` mean/covariance and average share consistency.
+5. Component predictions in the target domain are latent but physically constrained to be non-negative, additive, and relation-consistent.

@@ -44,6 +44,7 @@ class DataBundle:
     target_train_df: pd.DataFrame
     target_val_df: pd.DataFrame
     scaler: StandardScaler
+    relation_prior: Dict[str, np.ndarray]
 
 
 def load_csvs(cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -104,6 +105,7 @@ def split_and_scale(cfg: Config) -> DataBundle:
         batch_size=min(cfg.batch_size, len(tgt_val_df)),
         shuffle=False,
     )
+    relation_prior = build_relation_prior(src_train_df, cfg)
 
     return DataBundle(
         source_train_loader=source_train_loader,
@@ -115,7 +117,25 @@ def split_and_scale(cfg: Config) -> DataBundle:
         target_train_df=tgt_train_df,
         target_val_df=tgt_val_df,
         scaler=scaler,
+        relation_prior=relation_prior,
     )
+
+
+def build_relation_prior(df: pd.DataFrame, cfg: Config) -> Dict[str, np.ndarray]:
+    comp = df[cfg.component_cols].to_numpy(dtype=np.float32)
+    total = np.clip(comp.sum(axis=1, keepdims=True), cfg.relation_eps, None)
+    share = np.clip(comp / total, cfg.relation_eps, None)
+    log_share = np.log(share)
+    clr = log_share - log_share.mean(axis=1, keepdims=True)
+    clr_mean = clr.mean(axis=0).astype(np.float32)
+    clr_centered = clr - clr_mean
+    clr_cov = (clr_centered.T @ clr_centered / max(len(clr) - 1, 1)).astype(np.float32)
+    share_mean = share.mean(axis=0).astype(np.float32)
+    return {
+        "clr_mean": clr_mean,
+        "clr_cov": clr_cov,
+        "share_mean": share_mean,
+    }
 
 
 def save_scaler(scaler: StandardScaler, output_dir: str) -> None:
